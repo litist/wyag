@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-import libwyag
+import libwyag as wyag
 import sys
 
 
@@ -19,10 +19,28 @@ argsp.add_argument("path",
                     default=".",
                     help="Where to create the repository.")
 
+# cat-file subparser
+argsp = argsubparsers.add_parser("cat-file", help="Provide content of repository objects")
+argsp.add_argument("type",
+                    metavar="type",
+                    choices=["blob", "commit", "tag", "tree"],
+                    help="Specify the object type")
+argsp.add_argument("object",
+                    metavar="object",
+                    help="The object to display")
+
+def cmd_cat_file(args):
+    repo = wyag.repo_find()
+    cat_file(repo, args.object, fmt=args.type.encode())
+
+def cat_file(repo, obj, fmt=None):
+    obj = wyag.object_read(repo, wyag.object_find(repo, obj, fmt=fmt))
+    sys.stdout.buffer.write(obj.serialize())
+
 
 
 def cmd_init(args):
-    libwyag.repo_create(args.path)
+    wyag.repo_create(args.path)
 
 
 
@@ -30,6 +48,7 @@ def main(argv=sys.argv[1:]):
     args = argparser.parse_args(argv)
 
     if args.command == "init"       : cmd_init(args)
+    elif args.command == "cat-file" : cmd_cat_file(args)
     else :
         print("No command specified")
         return -1

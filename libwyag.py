@@ -38,16 +38,19 @@ class GitRepository(object):
                 raise Exception("Unsupported repositoryformatversion {}".format(vers))
 
 
+
 def repo_path(repo, *path):
     """Comput path under repo's gitdir"""
     return os.path.join(repo.gitdir, *path)
 
+
 def repo_file(repo, *path, mkdir=False):
-    """Same as repo_path, but create dirname(*paht) if asent. For example,
+    """Same as repo_path, but create dirname(*path) if absent. For example,
     repo_file(r, refs, remotes, origin, HEAD) will create .git/refs/remotes/origin."""
 
     if repo_dir(repo, *path[:-1], mkdir=mkdir):
         return repo_path(repo, *path)
+
 
 def repo_dir(repo, *path, mkdir=False):
     """Same as repo_path, but mkdir *path if absent if mkdir."""
@@ -131,4 +134,95 @@ def repo_find(path=".", required=True):
             return None
 
     return repo_find(parent, required)
+
+
+
+class GitObject (object):
+
+    repo = None
+
+    def __init__(self, repo, data=None):
+        self.repo = repo
+
+        if data != None:
+            self.deserialize(data)
+
+    def serialize(self):
+        """This function MUST be implemented by subclassses.
+
+        It must read the obkect's contens from self.data, a byte string, and
+        do whaterver it takes to conber it into a meaningful representation.
+        What exactly that means depends on each subclass."""
+
+        raise Exception("Unimplemented!")
+
+    def deserialize(self, data):
+        raise Exception("Unimplemented!")
+
+
+
+def object_find(repo, name, fmt=None, follow=True):
+    return name
+
+
+
+def object_read(repo, sha):
+    """Read object object_id from Git repository repo. Return a GitObject
+    whose exact type depends on the object."""
+
+    path = repo_file(repo, "objects", sha[:2], sha[2:])
+
+    with open(path, "rb") as f:
+        raw = zlib.decompress(f.read())
+
+        # read object type
+        x = raw.find(b' ')
+        fmt = raw[0:x]
+
+        # read and validate  object size
+        y = raw.find(b'\x00', x)
+        size = int(raw[x:y].decode("ascii"))
+        if size != len(raw)-y-1:
+            raise Exception("Malformed object {}: bad length".format(sha))
+
+        # pick correct constructor
+        if fmt==b'commit' : c=GitCommit
+        elif fmt==b'tree' : c=GitTree
+        elif fmt==b'tag' : c=GitTag
+        elif fmt==b'blob' : c=GitBlob
+        else:
+            raise Exception("Unknown type {} for object {}".format(fmt.decode("ascii"), sha))
+
+        return c(repo, raw[y+1:])
+
+
+def object_write(obj, actually_write=True):
+    # serialize object data
+    data = obj.serialize()
+    
+    # add header
+    result = obj.fmt + b' ' + str(len(data)).encode() + b'\x00' + data
+
+    # get hash
+    sha = hashlib.sha1(result).hexdigest()
+
+    if actually_write:
+        # compute path
+        path = repo_file(obj.repo, "objects", sha[:2], sha[2:], mkdir=actually_write)
+
+        with open(path, 'wb') as f:
+            # compress and write
+            f.write(zlib.compress(result))
+
+    return sha
+
+
+class GitBlob(GitObject):
+    fmt=b'blob'
+
+    def serialize(self):
+        return self.blobdata
+
+    def deserialize(self, data):
+        self.blobdata = data
 
