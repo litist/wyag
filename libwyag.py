@@ -216,6 +216,20 @@ def object_write(obj, actually_write=True):
 
     return sha
 
+def object_hash(f, fmt, repo=None):
+    data = f.read()
+
+    # Choose constructor depnedo on object type foound in header
+    if fmt == b'commit' : obj=GitCommit(repo, data)
+    elif fmt == b'tree' : obj=GitTree(repo, data)
+    elif fmt == b'tag' : obj=GitTag(repo, data)
+    elif fmt == b'blob' : obj=GitBlob(repo, data)
+    else:
+        raise Exception("Unknown type {}".format(fmt))
+
+    return object_write(obj, repo)
+
+
 
 class GitBlob(GitObject):
     fmt=b'blob'
