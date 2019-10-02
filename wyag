@@ -103,6 +103,27 @@ def log_graphviz(repo, sha, seen):
         log_graphviz(repo, p, seen)
 
 
+# ls-tree command
+argsp = argsubparsers.add_parser("ls-tree", help="Pretty-print a tree object")
+argsp.add_argument("object", help="The object to show.")
+
+def cmd_ls_tree(args):
+    repo = wyag.repo_find()
+    obj = wyag.object_read(repo, wyag.object_find(repo, args.object, fmt=b'tree'))
+
+    if obj.fmt == b'commit':
+        obj = wyag.object_read(repo, obj.kvlm[b'tree'].decode("ascii"))
+
+    for item in obj.items:
+        print("{0} {1} {2}\t{3}".format(
+            "0" * (6 -len(item.mode)) + item.mode.decode("ascii"),
+            wyag.object_read(repo, item.sha).fmt.decode("ascii"),
+            item.sha,
+            item.path.decode("ascii")
+        ))
+
+
+
 
 def main(argv=sys.argv[1:]):
     args = argparser.parse_args(argv)
@@ -111,6 +132,7 @@ def main(argv=sys.argv[1:]):
     elif args.command == "cat-file"    : cmd_cat_file(args)
     elif args.command == "hash-object" : cmd_hash_object(args)
     elif args.command == "log"         : cmd_log(args)
+    elif args.command == "ls-tree"     : cmd_ls_tree(args)
     else :
         print("No command specified")
         return -1
